@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="EchoVault.Application/EchoVault.Application.csproj" />
+  <Project Path="EchoVault.Core/EchoVault.Core.csproj" />
+  <Project Path="EchoVault.Infrastructure/EchoVault.Infrastructure.csproj" />
+  <Project Path="EchoVault.TUI/EchoVault.TUI.csproj" />
+</Solution>

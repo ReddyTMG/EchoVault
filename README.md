@@ -18,3 +18,7 @@ The goal of this project is to demonstrate a production-grade approach to local 
 - **Clean Architecture:** To separate domain logic from the specialized Terminal UI (TUI).
 - **High-Performance Persistence:** Using `sqlite-vec` for in-process, lightning-fast vector similarity searches.
 - **Local Inference:** Leveraging `LLamaSharp` to run GGUF models directly on the CPU/GPU, removing reliance on expensive and privacy-leaking third-party APIs.
+
+## Model Tested and Used
+
+- **all-MiniLM-L6-v2-GGUF:** https://huggingface.co/cstr/all-MiniLM-L6-v2-GGUF (Place the model in C:/Models/)

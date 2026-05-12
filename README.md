@@ -1,5 +1,6 @@
 # EchoVault 
 ![Homepage](images/home.png)
+
 **Local Intelligence. Private Documentation.**
 
 EchoVault is a high-performance RAG (Retrieval-Augmented Generation) system built with .NET 9. It allows users to index local PDF documents into a SQLite vector store and interact with them using local LLMs (Llama 3.2). **No data ever leaves your machine.**

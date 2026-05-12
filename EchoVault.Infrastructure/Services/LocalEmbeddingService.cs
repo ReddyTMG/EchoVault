@@ -1,6 +1,7 @@
 using EchoVault.Application.Interfaces;
 using LLama;
 using LLama.Common;
+using LLama.Native;
 
 namespace EchoVault.Infrastructure.Services;
 
@@ -11,6 +12,7 @@ public class LocalEmbeddingService : IEmbeddingService, IDisposable
 
   public LocalEmbeddingService(string modelPath)
   {
+    NativeLogConfig.llama_log_set((level, text) => { });
     // 1. Load the model weights
     var parameters = new ModelParams(modelPath)
     {

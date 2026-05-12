@@ -1,105 +1,84 @@
-﻿// using EchoVault.Infrastructure.Data;
-// using EchoVault.Infrastructure.Services;
-// using EchoVault.Application.Services;
-// using EchoVault.Application.Interfaces;
-// using Microsoft.Extensions.DependencyInjection;
-// using Microsoft.EntityFrameworkCore;
-
-// var services = new ServiceCollection();
-
-// // 1. Setup Database
-// services.AddDbContext<VaultDbContext>(options =>
-//     options.UseSqlite("Data Source=vault.db"));
-
-// // 2. Setup AI Services (Hardcoded for now, will be dynamic in TUI)
-// string myModelPath = @"C:/Models/all-MiniLM-L6-v2.gguf"; 
-// services.AddSingleton<IEmbeddingService>(sp => new LocalEmbeddingService(myModelPath));
-
-// // 3. Setup Ingestion & Sync
-// services.AddScoped<IPdfIngestionService, PdfIngestionService>();
-// services.AddScoped<SyncService>();
-
-// var serviceProvider = services.BuildServiceProvider();
-
-// // Now you can "Ask" for the SyncService and it will 
-// // automatically have the IngestionService and EmbeddingService injected!
-// var syncService = serviceProvider.GetRequiredService<SyncService>();
-
+﻿using EchoVault.TUI.UI;
+using EchoVault.Application.Services;
 using EchoVault.Infrastructure.Data;
 using EchoVault.Infrastructure.Services;
-using EchoVault.Application.Services;
 using EchoVault.Application.Interfaces;
-using EchoVault.Core.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Spectre.Console;
 using DotNetEnv;
 
-Console.WriteLine("=== EchoVault: Dummy Sync Test ===");
+string envPath = ".env";
 
-// UPDATE THESE PATHS TO YOUR ACTUAL LOCAL PATHS
-Env.Load();
-string dbConnection = Env.GetString("DB_CONNECTION");
-string modelPath = Env.GetString("MODEL_PATH");
-string testPdfFolder = Env.GetString("TEST_PDF_FOLDER");
-if (string.IsNullOrEmpty(modelPath) || string.IsNullOrEmpty(testPdfFolder))
+// If .env isn't in the current folder, check the parent
+if (!File.Exists(envPath))
 {
-    Console.WriteLine("Error: Please ensure MODEL_PATH and TEST_PDF_FOLDER are set in your .env file.");
+    envPath = Path.Combine("..", ".env");
+}
+
+// 1. Configuration
+Env.Load(envPath);
+string dbConn = Env.GetString("DB_CONNECTION");
+string modelPath = Env.GetString("MODEL_PATH");
+
+if (string.IsNullOrEmpty(modelPath))
+{
+    AnsiConsole.MarkupLine($"[red]Error:[/] Could not find .env at {envPath}");
     return;
 }
 
-// 1. Setup DI
+// 2. DI Container Setup
 var services = new ServiceCollection();
-
-services.AddDbContext<VaultDbContext>(options =>
-    options.UseSqlite("dbConnection"));
-
-
+services.AddDbContext<VaultDbContext>(options => options.UseSqlite(dbConn));
 services.AddSingleton<IEmbeddingService>(sp => new LocalEmbeddingService(modelPath));
 services.AddScoped<IPdfIngestionService, PdfIngestionService>();
 services.AddScoped<SyncService>();
 
-var sp = services.BuildServiceProvider();
+var serviceProvider = services.BuildServiceProvider();
 
-// 2. Initialize DB and Create Dummy Data
-using var scope = sp.CreateScope();
-var db = scope.ServiceProvider.GetRequiredService<VaultDbContext>();
-db.Database.EnsureCreated();
+// 3. App Loop
+AnsiConsole.Write(new FigletText("EchoVault").Color(Color.Cyan1));
 
-// Create a dummy user if none exists
-var user = await db.Users.FirstOrDefaultAsync() ?? new User { Username = "DevUser" };
-if (db.Entry(user).State == EntityState.Detached) db.Users.Add(user);
-
-// Create a watch folder if none exists
-var folder = await db.WatchFolders.FirstOrDefaultAsync() ?? new WatchFolder { 
-    Path = testPdfFolder, 
-    UserId = user.Id 
-};
-if (db.Entry(folder).State == EntityState.Detached) db.WatchFolders.Add(folder);
-await db.SaveChangesAsync();
-
-// 3. Run the Sync Logic
-var syncService = scope.ServiceProvider.GetRequiredService<SyncService>();
-
-Console.WriteLine($"Scanning folder: {testPdfFolder}...");
-var changes = await syncService.IdentifyChangesAsync(folder);
-
-if (changes.Count == 0)
+while (true)
 {
-    Console.WriteLine("No new or changed PDFs found.");
-}
-else
-{
-    Console.WriteLine($"Found {changes.Count} new/changed files. Processing...");
-    foreach (var doc in changes)
+    var choice = AnsiConsole.Prompt(
+        new SelectionPrompt<string>()
+            .Title("What would you like to do?")
+            .AddChoices("🔍 Search", "🔄 Sync", "❌ Exit"));
+
+    if (choice == "❌ Exit") break;
+
+    using var scope = serviceProvider.CreateScope();
+    var syncService = scope.ServiceProvider.GetRequiredService<SyncService>();
+    var db = scope.ServiceProvider.GetRequiredService<VaultDbContext>();
+
+    if (choice == "🔄 Sync")
     {
-        Console.WriteLine($"-> Processing {doc.FileName}...");
-        await syncService.ProcessDocumentAsync(doc, user.Id);
-        
-        // Save the indexed document and its chunks to the DB
-        db.Documents.Add(doc);
-        await db.SaveChangesAsync();
-        Console.WriteLine($"   Success! {doc.Chunks.Count} chunks stored with embeddings.");
+        // For the dummy test, we'll grab the first watch folder
+        var folder = await db.WatchFolders.FirstOrDefaultAsync();
+        var user = await db.Users.FirstOrDefaultAsync();
+
+        if (folder != null && user != null)
+        {
+            await SyncDisplay.RunSyncWithProgress(syncService, folder, user.Id);
+
+            // Save changes to DB (Important: SyncDisplay processes them, but we persist here)
+            await db.SaveChangesAsync();
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[red]No WatchFolder found in DB. Please run the Dummy Test script first to seed data.[/]");
+        }
+
+        Console.WriteLine("\nPress any key to return to menu...");
+        Console.ReadKey();
+        AnsiConsole.Clear();
+    }
+
+    if (choice == "🔍 Search")
+    {
+        var embeddingService = scope.ServiceProvider.GetRequiredService<IEmbeddingService>();
+        await SearchView.RunSearch(db, embeddingService);
+        AnsiConsole.Clear();
     }
 }
-
-Console.WriteLine("=== Test Complete ===");

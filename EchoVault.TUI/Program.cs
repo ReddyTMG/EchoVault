@@ -20,6 +20,7 @@ if (!File.Exists(envPath))
 Env.Load(envPath);
 string dbConn = Env.GetString("DB_CONNECTION");
 string modelPath = Env.GetString("MODEL_PATH");
+string chatModelPath = Env.GetString("CHAT_MODEL_PATH");
 
 if (string.IsNullOrEmpty(modelPath))
 {
@@ -31,6 +32,7 @@ if (string.IsNullOrEmpty(modelPath))
 var services = new ServiceCollection();
 services.AddDbContext<VaultDbContext>(options => options.UseSqlite(dbConn));
 services.AddSingleton<IEmbeddingService>(sp => new LocalEmbeddingService(modelPath));
+services.AddSingleton(sp => new LlamaChatService(chatModelPath));
 services.AddScoped<IPdfIngestionService, PdfIngestionService>();
 services.AddScoped<SyncService>();
 
@@ -42,15 +44,25 @@ AnsiConsole.Write(new FigletText("EchoVault").Color(Color.Cyan1));
 while (true)
 {
     var choice = AnsiConsole.Prompt(
-        new SelectionPrompt<string>()
-            .Title("What would you like to do?")
-            .AddChoices("🔍 Search", "🔄 Sync", "❌ Exit"));
-
-    if (choice == "❌ Exit") break;
+    new SelectionPrompt<string>()
+        .Title("Main Menu")
+        .AddChoices("🤖 AI Chat", "🔍 Search Chunks", "🔄 Sync", "❌ Exit"));
 
     using var scope = serviceProvider.CreateScope();
     var syncService = scope.ServiceProvider.GetRequiredService<SyncService>();
     var db = scope.ServiceProvider.GetRequiredService<VaultDbContext>();
+
+    // Inside the switch/if:
+    if (choice == "🤖 AI Chat")
+    {
+        var embeddingService = scope.ServiceProvider.GetRequiredService<IEmbeddingService>();
+        var chatService = scope.ServiceProvider.GetRequiredService<LlamaChatService>();
+        await ChatView.RunChat(db, embeddingService, chatService);
+        AnsiConsole.Clear();
+    }
+
+    if (choice == "❌ Exit") break;
+
 
     if (choice == "🔄 Sync")
     {

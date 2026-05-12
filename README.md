@@ -33,7 +33,11 @@ git clone https://github.com/your-username/EchoVault.git
 cd EchoVault
 ```
 
-### 2. Configure Environment
+### 2. Configure create database
+1. Install the EF Core tools: `dotnet tool install --global dotnet-ef`
+2. Apply migrations: `dotnet ef database update`
+
+### 3. Configure Environment
 
 Create a `.env` file in the root directory:
 
@@ -44,14 +48,14 @@ CHAT_MODEL_PATH="C:/Models/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
 TEST_PDF_FOLDER="C:/Your/Path/To/PDFs"
 ```
 
-### 3. Download Models
+### 4. Download Models
 
 Download the following GGUF models from HuggingFace and place them in your `C:/Models/` folder:
 
 - **Embedding:** [nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF)
 - **Chat:** [Llama-3.2-1B-Instruct](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF)
 
-### 4. Run the Application
+### 5. Run the Application
 
 ```bash
 cd EchoVault.TUI
